@@ -42,8 +42,7 @@ jobs:
               exit 1
             fi
           done
-          sudo chown -R 1001:1001 "$STORAGE_HOST_DIR"
-          sudo chmod -R u+rwX,g+rX,o-rwx "$STORAGE_HOST_DIR"
+          
           echo "Using existing persistent data directory: $STORAGE_HOST_DIR"
 
       - name: Build Docker Image
