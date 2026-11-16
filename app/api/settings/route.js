@@ -4,18 +4,7 @@ import { SITE } from '@/lib/siteData';
 function normalizePaymentQrUrl(paymentQrUrl) {
   if (typeof paymentQrUrl !== 'string') return '';
   const trimmed = paymentQrUrl.trim();
-  if (!trimmed) return '';
-
-  try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-      return trimmed;
-    }
-  } catch {
-    return '';
-  }
-
-  return '';
+  return trimmed.startsWith('/api/uploads/Payments/payment-qr/') ? trimmed : '';
 }
 
 async function ensureDefaultSettings(db) {

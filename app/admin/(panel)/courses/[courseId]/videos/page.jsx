@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Plus, Upload, Play, Video } from 'lucide-react';
+import { Plus, Upload, Play, Trash2 } from 'lucide-react';
 import VideoManager from '../../../../components/VideoManager';
 
 export default function CourseVideoManagementPage() {
@@ -13,6 +13,7 @@ export default function CourseVideoManagementPage() {
   const [modules, setModules] = useState([]);
   const [selectedModule, setSelectedModule] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [deletingVideo, setDeletingVideo] = useState('');
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
 
@@ -58,6 +59,37 @@ export default function CourseVideoManagementPage() {
     setSelectedModule(nextTitle);
   };
 
+  const deleteVideo = async (moduleTitle, video, videoIndex) => {
+    const confirmation = video?.storagePath
+      ? `Delete "${video.title}" from this course and remove its file from the server?`
+      : `Remove "${video.title}" from this course? Its old external copy will not be changed.`;
+    if (!window.confirm(confirmation)) return;
+
+    const deletingKey = video?.storagePath || `${moduleTitle}:${videoIndex}:${video?.title || ''}`;
+    setDeletingVideo(deletingKey);
+    setError('');
+    try {
+      const response = await fetch(`/api/admin/courses/${courseId}/videos`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          moduleTitle,
+          videoIndex,
+          videoTitle: video.title || '',
+          storagePath: video.storagePath || '',
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.success) throw new Error(data?.error || 'Unable to delete video.');
+      setModules(Array.isArray(data.modules) ? data.modules : []);
+    } catch (deleteError) {
+      setError(deleteError.message || 'Unable to delete video.');
+    } finally {
+      setDeletingVideo('');
+    }
+  };
+
   const uploadVideo = async (file) => {
     if (!file || !courseId) {
       return;
@@ -72,15 +104,19 @@ export default function CourseVideoManagementPage() {
     setError('');
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('title', file.name.replace(/\.[^/.]+$/, '') || 'Uploaded lesson');
-      formData.append('moduleTitle', selectedModule || activeModule?.title || 'Module 1');
-
+      const moduleTitle = selectedModule || activeModule?.title || 'Module 1';
+      const videoTitle = file.name.replace(/\.[^/.]+$/, '') || 'Uploaded lesson';
       const response = await fetch(`/api/admin/courses/${courseId}/videos`, {
         method: 'POST',
         credentials: 'include',
-        body: formData,
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream',
+          'X-File-Name': encodeURIComponent(file.name),
+          'X-File-Size': String(file.size),
+          'X-Module-Title': encodeURIComponent(moduleTitle),
+          'X-Video-Title': encodeURIComponent(videoTitle),
+        },
+        body: file,
       });
 
       const data = await response.json();
@@ -192,7 +228,15 @@ export default function CourseVideoManagementPage() {
                           ) : (
                             <button type="button" className="rounded-lg border border-slate-700 bg-slate-900 p-2 text-slate-300 hover:text-white"><Play className="h-3.5 w-3.5" /></button>
                           )}
-                          <button type="button" className="rounded-lg border border-slate-700 bg-slate-900 p-2 text-slate-300 hover:text-white"><Video className="h-3.5 w-3.5" /></button>
+                          <button
+                            type="button"
+                            disabled={deletingVideo === (video.storagePath || `${activeModule.title}:${index}:${video.title || ''}`)}
+                            title={video.storagePath ? 'Delete video and server file' : 'Remove legacy external video entry'}
+                            onClick={() => deleteVideo(activeModule.title, video, index)}
+                            className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-red-300 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>

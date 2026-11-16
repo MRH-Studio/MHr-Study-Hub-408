@@ -21,6 +21,31 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Verify and Prepare Existing Server Data Directory
+        env:
+          STORAGE_HOST_DIR: /home/mrh123/data/Project-1
+        run: |
+          set -eu
+          for relative in \
+            "courses/Basic of Computer" \
+            "courses/Basic of C Programming" \
+            "courses/Basic of Microsoft Excel" \
+            "courses/Basic of Microsoft PowerPoint" \
+            "courses/Basic of Microsoft Word" \
+            "courses/Basic of Power BI" \
+            "courses/Basic of Python" \
+            "courses/Basic of SQL" \
+            "Payments" \
+            "Recipt"; do
+            if [ ! -d "$STORAGE_HOST_DIR/$relative" ]; then
+              echo "::error::Required existing data directory is missing: $STORAGE_HOST_DIR/$relative"
+              exit 1
+            fi
+          done
+          sudo chown -R 1001:1001 "$STORAGE_HOST_DIR"
+          sudo chmod -R u+rwX,g+rX,o-rwx "$STORAGE_HOST_DIR"
+          echo "Using existing persistent data directory: $STORAGE_HOST_DIR"
+
       - name: Build Docker Image
         run: |
           docker build --pull \
@@ -53,7 +78,7 @@ jobs:
           docker stop mrh-study-hub || true
           docker rm mrh-study-hub || true
 
-      - name: Deploy Study Hub
+      - name: Deploy Study Hub with Existing Persistent Data Directory
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           MONGODB_DB_NAME: ${{ secrets.MONGODB_DB_NAME }}
@@ -61,26 +86,22 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           ADMIN_SESSION_SECRET: ${{ secrets.ADMIN_SESSION_SECRET }}
           STUDENT_SESSION_SECRET: ${{ secrets.STUDENT_SESSION_SECRET }}
-          GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
-          GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
-          GOOGLE_DRIVE_REFRESH_TOKEN: ${{ secrets.GOOGLE_DRIVE_REFRESH_TOKEN }}
-          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          STORAGE_HOST_DIR: /home/mrh123/data/Project-1
         run: |
+          set -eu
           docker run -d \
             --restart unless-stopped \
             --name mrh-study-hub \
             -p 1708:3000 \
+            --mount "type=bind,source=$STORAGE_HOST_DIR,target=$STORAGE_HOST_DIR" \
             -e NODE_ENV=production \
+            -e STORAGE_DIR="$STORAGE_HOST_DIR" \
             -e MONGODB_URI \
             -e MONGODB_DB_NAME \
             -e ADMIN_USERNAME \
             -e ADMIN_PASSWORD \
             -e ADMIN_SESSION_SECRET \
             -e STUDENT_SESSION_SECRET \
-            -e GOOGLE_DRIVE_CLIENT_ID \
-            -e GOOGLE_DRIVE_CLIENT_SECRET \
-            -e GOOGLE_DRIVE_REFRESH_TOKEN \
-            -e GOOGLE_DRIVE_FOLDER_ID \
             mrh-study-hub:latest
 
       - name: Verify Deployment
@@ -90,6 +111,7 @@ jobs:
             if curl --fail --silent http://127.0.0.1:1708/api/admin > /dev/null; then
               echo "MR.H Study Hub is responding."
               docker ps --filter name=mrh-study-hub
+              docker inspect mrh-study-hub --format '{{range .Mounts}}{{println .Source "->" .Destination}}{{end}}'
               exit 0
             fi
             sleep 3

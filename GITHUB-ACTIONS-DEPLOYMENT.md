@@ -9,7 +9,7 @@ In GitHub: **Settings → Secrets and variables → Actions → New repository s
 
 Add:
 
-- `MONGODB_URI` — MongoDB connection string
+- `MONGODB_URI` — MongoDB connection string (MongoDB continues to store application records and file metadata)
 - `MONGODB_DB_NAME` — database name used by this app
 - `ADMIN_USERNAME` — production admin username
 - `ADMIN_PASSWORD` — strong production admin password
@@ -24,14 +24,43 @@ openssl rand -hex 32
 
 Do not commit `.env` files or put secret values directly in the workflow.
 
-## Optional Google Drive secrets
+## Persistent server file storage
 
-If the app's Google Drive upload feature is used, also add:
+Uploaded file contents are stored only in `/home/mrh123/data/Project-1/`. GitHub Actions verifies that the existing folders are present, prepares their permissions for the container's `1001:1001` user, and bind-mounts the host directory at the same path inside the container. It does not create or alter the directory structure.
 
-- `GOOGLE_DRIVE_CLIENT_ID`
-- `GOOGLE_DRIVE_CLIENT_SECRET`
-- `GOOGLE_DRIVE_REFRESH_TOKEN`
-- `GOOGLE_DRIVE_FOLDER_ID`
+```text
+/home/mrh123/data/Project-1/
+├── courses/
+│   ├── Basic of Computer/
+│   ├── Basic of C Programming/
+│   ├── Basic of Microsoft Excel/
+│   ├── Basic of Microsoft PowerPoint/
+│   ├── Basic of Microsoft Word/
+│   ├── Basic of Power BI/
+│   ├── Basic of Python/
+│   └── Basic of SQL/
+├── Payments/
+└── Recipt/
+```
+
+- MongoDB course records are mapped to their existing named course directories; unknown courses are rejected rather than creating a new course directory. Course videos are grouped below the mapped directory by module.
+- Admission payment-proof images are saved under `Payments/` and are only served to an authenticated admin.
+- The current payment QR is saved under `Payments/payment-qr/`; replacing it removes the previous local QR file after the new one is saved.
+- Receipt files belong under the existing `Recipt/` directory.
+- MongoDB stores records and the relative storage paths/URLs; uploaded file bytes remain on this server.
+- Back up `/home/mrh123/data/Project-1/` separately from MongoDB. Do not delete or relocate it during a deployment.
+- Video uploads are streamed directly to disk. When using Nginx in front of the app, configure a suitable request size and disable request buffering for the app location, for example:
+
+```nginx
+client_max_body_size 2g;
+proxy_request_buffering off;
+proxy_read_timeout 3600s;
+proxy_send_timeout 3600s;
+```
+
+## Existing files
+
+Previously stored external file links are not automatically copied to the server. Re-upload those files through the Admin Panel where supported. Existing external copies are not modified.
 
 ## Deployment
 
@@ -43,6 +72,12 @@ Test on the server:
 docker ps
 curl -I http://localhost:1708
 docker logs --tail 50 mrh-study-hub
+```
+
+Verify the mounted host directory with:
+
+```bash
+sudo find /home/mrh123/data/Project-1 -maxdepth 4 -type d -print
 ```
 
 The health endpoint used by the workflow is `/api/admin` (GET).

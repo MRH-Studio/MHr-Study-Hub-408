@@ -1,23 +1,12 @@
 import { getAdminSession } from '@/lib/adminAuth';
 import { getDb } from '@/lib/mongodb';
 import { SITE } from '@/lib/siteData';
-import { getDriveCredentials, uploadToGoogleDrive } from '@/lib/googleDrive';
+import { deleteStoredFile, saveUploadedFile, storagePathFromUploadUrl } from '@/lib/localStorage';
 
 function normalizePaymentQrUrl(paymentQrUrl) {
   if (typeof paymentQrUrl !== 'string') return '';
   const trimmed = paymentQrUrl.trim();
-  if (!trimmed) return '';
-
-  try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-      return trimmed;
-    }
-  } catch {
-    return '';
-  }
-
-  return '';
+  return trimmed.startsWith('/api/uploads/Payments/payment-qr/') ? trimmed : '';
 }
 
 async function ensureDefaultSettings(db) {
@@ -31,6 +20,7 @@ async function ensureDefaultSettings(db) {
       name: 'registration_payment',
       registrationPrice: fallbackPrice,
       paymentQrUrl: '',
+      paymentQrPath: '',
       status: 'active',
       updatedAt: new Date(),
       lastUpdatedAt: new Date(),
@@ -43,14 +33,16 @@ async function ensureDefaultSettings(db) {
 
   const normalizedPrice = Number(settings.registrationPrice ?? fallbackPrice);
   const normalizedQrUrl = normalizePaymentQrUrl(settings.paymentQrUrl);
+  const normalizedQrPath = storagePathFromUploadUrl(normalizedQrUrl);
 
-  if (settings.paymentQrUrl !== normalizedQrUrl || Number(settings.registrationPrice ?? fallbackPrice) !== normalizedPrice) {
+  if (settings.paymentQrUrl !== normalizedQrUrl || settings.paymentQrPath !== normalizedQrPath || Number(settings.registrationPrice ?? fallbackPrice) !== normalizedPrice) {
     await collection.updateOne(
       { name: 'registration_payment' },
       {
         $set: {
           registrationPrice: normalizedPrice,
           paymentQrUrl: normalizedQrUrl,
+          paymentQrPath: normalizedQrPath,
           updatedAt: new Date(),
           lastUpdatedAt: new Date(),
           registrationPriceUpdatedAt: settings.registrationPriceUpdatedAt || new Date(),
@@ -124,17 +116,18 @@ export async function POST(request) {
         return Response.json({ error: 'A QR image file is required.' }, { status: 400 });
       }
 
+      let uploadedFile;
       try {
-        const { folderId } = getDriveCredentials();
-        const uploadedFile = await uploadToGoogleDrive(file, folderId);
-        const paymentQrUrl = normalizePaymentQrUrl(uploadedFile.webViewLink || uploadedFile.webContentLink || '');
-
-        if (!paymentQrUrl) {
-          return Response.json({ error: 'Unable to generate a valid QR code URL.' }, { status: 500 });
-        }
+        uploadedFile = await saveUploadedFile(file, ['Payments', 'payment-qr'], {
+          allowedMimePrefixes: ['image/'],
+          allowedExtensions: ['.jpg', '.jpeg', '.png', '.webp', '.gif'],
+          maxBytes: 10 * 1024 * 1024,
+        });
 
         const now = new Date();
         const doc = await ensureDefaultSettings(db);
+        const previousPath = storagePathFromUploadUrl(doc.paymentQrUrl);
+        const paymentQrUrl = uploadedFile.url;
         await collection.updateOne(
           { name: 'registration_payment' },
           {
@@ -142,6 +135,7 @@ export async function POST(request) {
               ...doc,
               name: 'registration_payment',
               paymentQrUrl,
+              paymentQrPath: uploadedFile.relativePath,
               paymentQrUpdatedAt: now,
               updatedAt: now,
               lastUpdatedAt: now,
@@ -152,22 +146,30 @@ export async function POST(request) {
           { upsert: true }
         );
 
+        if (previousPath && previousPath !== uploadedFile.relativePath) {
+          await deleteStoredFile(previousPath).catch((cleanupError) => {
+            console.error('Previous payment QR cleanup failed:', cleanupError);
+          });
+        }
+
         return Response.json({
           success: true,
-          message: 'Payment QR code updated successfully.',
+          message: 'Payment QR code saved on this server.',
           paymentQrUrl,
           lastUpdated: now.toISOString(),
           action,
         });
       } catch (error) {
-        const message = error?.message || 'Google Drive upload failed.';
+        if (uploadedFile?.relativePath) await deleteStoredFile(uploadedFile.relativePath).catch(() => {});
+        const message = error?.message || 'Local server upload failed.';
+        const status = /exceeds the maximum|unsupported file/i.test(message) ? 400 : 500;
         return Response.json(
           {
             error: message,
             keepExistingQrUrl: true,
             messageDetail: 'The current QR image was kept unchanged because the upload did not succeed.',
           },
-          { status: 400 }
+          { status }
         );
       }
     }
@@ -192,6 +194,7 @@ export async function POST(request) {
             ...doc,
             name: 'registration_payment',
             paymentQrUrl: nextQrUrl,
+            paymentQrPath: storagePathFromUploadUrl(nextQrUrl),
             paymentQrUpdatedAt: now,
             updatedAt: now,
             lastUpdatedAt: now,
@@ -226,6 +229,7 @@ export async function POST(request) {
           name: 'registration_payment',
           registrationPrice,
           paymentQrUrl: currentQrUrl,
+          paymentQrPath: storagePathFromUploadUrl(currentQrUrl),
           registrationPriceUpdatedAt: now,
           paymentQrUpdatedAt: doc.paymentQrUpdatedAt || null,
           updatedAt: now,

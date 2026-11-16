@@ -163,6 +163,14 @@ export default function AdmissionsPage() {
             <div><p className="text-xs uppercase tracking-wide text-slate-400">Contact</p><p className="text-white">{selectedRow.phone} / {selectedRow.email}</p></div>
             <div><p className="text-xs uppercase tracking-wide text-slate-400">Course</p><p className="text-white">{selectedRow.course}</p></div>
           </div>
+          {selectedRow.paymentProofImage ? (
+            <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+              <p className="text-xs uppercase tracking-wide text-slate-400">Payment proof</p>
+              <a href={selectedRow.paymentProofImage} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-sm text-indigo-300 hover:text-indigo-200">
+                {selectedRow.paymentProofName || 'View uploaded payment proof'}
+              </a>
+            </div>
+          ) : null}
           <div className="mt-4 flex flex-wrap gap-2">
             <button type="button" disabled={updatingId === selectedRow._id} onClick={() => updateApplication(selectedRow._id, 'Approved', selectedRow.paymentStatus || 'Paid')} className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50">Approve application</button>
             <button type="button" disabled={updatingId === selectedRow._id} onClick={() => updateApplication(selectedRow._id, 'Rejected', 'Failed')} className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200 hover:bg-red-500/20 disabled:opacity-50">Reject application</button>

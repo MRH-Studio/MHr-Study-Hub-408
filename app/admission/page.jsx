@@ -20,7 +20,7 @@ function AdmissionInner(){
   const [admission, setAdmission] = useState(null);
   const [txnId, setTxnId] = useState('');
   const [paymentNote, setPaymentNote] = useState('');
-  const [paymentProofImage, setPaymentProofImage] = useState('');
+  const [paymentProofFile, setPaymentProofFile] = useState(null);
   const [confirmed, setConfirmed] = useState(null);
   const [error, setError] = useState('');
   const [courses, setCourses] = useState([]);
@@ -79,15 +79,14 @@ function AdmissionInner(){
     if (!txnId) { setError('Enter your UPI transaction/reference ID.'); return; }
     setSubmitting(true);
     try {
+      const paymentData = new FormData();
+      paymentData.append('transactionId', txnId);
+      paymentData.append('paymentNote', paymentNote);
+      if (paymentProofFile) paymentData.append('paymentProof', paymentProofFile);
+
       const res = await fetch(`/api/admissions/${admission.id}/payment`, {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          transactionId: txnId,
-          paymentNote,
-          paymentProofImage,
-          imageName: paymentProofImage,
-        })
+        method: 'POST',
+        body: paymentData,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Failed');
@@ -178,15 +177,15 @@ function AdmissionInner(){
                     <label className="text-xs uppercase tracking-widest text-white/50">Payment proof image</label>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        setPaymentProofImage(file ? file.name : '');
+                        setPaymentProofFile(file || null);
                       }}
                       className="mt-1 block w-full rounded-xl bg-white/[0.04] border border-white/10 p-3 text-white file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-2 file:text-white file:font-medium"
                     />
-                    {paymentProofImage && (
-                      <div className="mt-2 text-xs text-blue-200">Selected file: {paymentProofImage}</div>
+                    {paymentProofFile && (
+                      <div className="mt-2 text-xs text-blue-200">Selected file: {paymentProofFile.name}</div>
                     )}
                   </div>
                   <div className="mt-4">
