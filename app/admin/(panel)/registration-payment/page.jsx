@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { CalendarDays, Check, CircleDollarSign, IndianRupee, RefreshCcw, ShieldCheck, Upload, X } from 'lucide-react';
+import { CalendarDays, Check, CircleDollarSign, IndianRupee, Mail, RefreshCcw, ShieldCheck, Upload, X } from 'lucide-react';
 import { SITE } from '@/lib/siteData';
 
 const DEFAULT_SEAT_LOCK_FEE = Number(SITE.seatLockFee ?? 20);
@@ -25,10 +25,14 @@ export default function RegistrationPaymentSettingsPage() {
   const [settings, setSettings] = useState({
     registrationPrice: DEFAULT_SEAT_LOCK_FEE,
     paymentQrUrl: '',
+    studentEmailFrom: 'mrh408520@gmail.com',
     lastUpdatedAt: new Date().toISOString(),
   });
   const [priceInput, setPriceInput] = useState(String(DEFAULT_SEAT_LOCK_FEE));
   const [priceMessage, setPriceMessage] = useState('');
+  const [studentEmailFromInput, setStudentEmailFromInput] = useState('mrh408520@gmail.com');
+  const [emailMessage, setEmailMessage] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
   const [qrPreview, setQrPreview] = useState('');
   const [qrFile, setQrFile] = useState(null);
   const [qrMessage, setQrMessage] = useState('');
@@ -48,9 +52,11 @@ export default function RegistrationPaymentSettingsPage() {
         setSettings({
           registrationPrice: activePrice,
           paymentQrUrl: activeQr,
+          studentEmailFrom: data.studentEmailFrom || data.settings?.studentEmailFrom || 'mrh408520@gmail.com',
           lastUpdatedAt: data.lastUpdatedAt || data.updatedAt || new Date().toISOString(),
         });
         setPriceInput(String(activePrice));
+        setStudentEmailFromInput(data.studentEmailFrom || data.settings?.studentEmailFrom || 'mrh408520@gmail.com');
         setQrPreview(activeQr);
       } catch (error) {
         setPriceMessage('Unable to load current settings.');
@@ -100,6 +106,42 @@ export default function RegistrationPaymentSettingsPage() {
       setPriceMessage('Registration price updated successfully.');
     } catch (error) {
       setPriceMessage(error.message || 'Unable to update registration price.');
+    }
+  };
+
+  const handleStudentEmailSubmit = async (event) => {
+    event.preventDefault();
+    const email = studentEmailFromInput.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailMessage('Enter a valid sender email address.');
+      return;
+    }
+
+    setSavingEmail(true);
+    setEmailMessage('');
+    try {
+      const response = await fetch('/api/admin/settings', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'student-email-from', studentEmailFrom: email }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || 'Unable to update sender email.');
+      }
+
+      setStudentEmailFromInput(data.studentEmailFrom);
+      setSettings((current) => ({
+        ...current,
+        studentEmailFrom: data.studentEmailFrom,
+        lastUpdatedAt: data.lastUpdated || current.lastUpdatedAt,
+      }));
+      setEmailMessage('Student sender email updated successfully.');
+    } catch (error) {
+      setEmailMessage(error.message || 'Unable to update sender email.');
+    } finally {
+      setSavingEmail(false);
     }
   };
 
@@ -367,6 +409,37 @@ export default function RegistrationPaymentSettingsPage() {
           </div>
         </section>
       </div>
+
+      <section className="rounded-[26px] border border-violet-500/40 bg-[#12192d]/90 p-4 shadow-[0_0_30px_rgba(104,84,196,0.12)] sm:p-5">
+        <div className="mb-4 flex items-center gap-3 border-b border-violet-500/20 pb-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.45)]">
+            <Mail className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-white">Student Credential Sender Email</h3>
+            <p className="mt-1 text-sm text-slate-400">This address is stored in the database and used as the From address for student emails.</p>
+          </div>
+        </div>
+        <form onSubmit={handleStudentEmailSubmit} className="flex flex-col gap-3 sm:flex-row">
+          <input
+            type="email"
+            value={studentEmailFromInput}
+            onChange={(event) => setStudentEmailFromInput(event.target.value)}
+            aria-label="Student credential sender email"
+            className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-[#0d1323] px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+            required
+          />
+          <button
+            type="submit"
+            disabled={savingEmail || loading}
+            className="rounded-xl border border-violet-400/70 bg-gradient-to-r from-violet-500 to-indigo-600 px-5 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {savingEmail ? 'Saving...' : 'Save Sender Email'}
+          </button>
+        </form>
+        {emailMessage ? <p className="mt-3 text-sm text-slate-300">{emailMessage}</p> : null}
+        <p className="mt-2 text-xs text-slate-500">The SMTP mailbox username and app password remain server secrets; for Gmail, the sender address should match that mailbox.</p>
+      </section>
     </div>
   );
 }

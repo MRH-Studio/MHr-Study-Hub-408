@@ -79,7 +79,9 @@ export default function AdmissionsPage() {
         throw new Error(data?.error || 'Unable to update application');
       }
       await loadRows();
-      setSelectedRow((current) => (current && (current._id === applicationId || current.id === applicationId) ? { ...current, admissionStatus, paymentStatus } : current));
+      setSelectedRow((current) => (current && (current._id === applicationId || current.id === applicationId)
+        ? { ...current, admissionStatus, ...(paymentStatus ? { paymentStatus } : {}) }
+        : current));
     } catch (error) {
       alert(error.message || 'Failed to update application.');
     } finally {
@@ -99,8 +101,8 @@ export default function AdmissionsPage() {
     { key: 'actions', label: 'Actions', render: (_, row) => (
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => setSelectedRow(row)} className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">View</button>
-        <button type="button" disabled={updatingId === row._id} onClick={() => updateApplication(row._id, 'Approved', row.paymentStatus || 'Paid')} className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50">Approve</button>
-        <button type="button" disabled={updatingId === row._id} onClick={() => updateApplication(row._id, 'Rejected', 'Failed')} className="rounded-lg border border-red-500/40 bg-red-500/10 px-2 py-1 text-xs text-red-200 hover:bg-red-500/20 disabled:opacity-50">Reject</button>
+        <button type="button" disabled={updatingId === row._id} onClick={() => updateApplication(row._id, 'Approved')} className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50">Approve</button>
+        <button type="button" disabled={updatingId === row._id} onClick={() => updateApplication(row._id, 'Rejected')} className="rounded-lg border border-red-500/40 bg-red-500/10 px-2 py-1 text-xs text-red-200 hover:bg-red-500/20 disabled:opacity-50">Reject</button>
       </div>
     ) },
   ];
@@ -162,18 +164,23 @@ export default function AdmissionsPage() {
             <div><p className="text-xs uppercase tracking-wide text-slate-400">Student</p><p className="text-white">{selectedRow.fullName}</p></div>
             <div><p className="text-xs uppercase tracking-wide text-slate-400">Contact</p><p className="text-white">{selectedRow.phone} / {selectedRow.email}</p></div>
             <div><p className="text-xs uppercase tracking-wide text-slate-400">Course</p><p className="text-white">{selectedRow.course}</p></div>
+            <div><p className="text-xs uppercase tracking-wide text-slate-400">Transaction ID</p><p className="break-all text-white">{selectedRow.paymentTransactionId || 'Not submitted'}</p></div>
+            <div><p className="text-xs uppercase tracking-wide text-slate-400">Registration amount</p><p className="text-white">₹{Number(selectedRow.paymentAmount || 0).toLocaleString('en-IN')}</p></div>
+            <div><p className="text-xs uppercase tracking-wide text-slate-400">Payment status</p><p className="text-white">{selectedRow.paymentStatus || 'Pending'}</p></div>
+            {selectedRow.paymentNote ? <div className="md:col-span-3"><p className="text-xs uppercase tracking-wide text-slate-400">Payment note</p><p className="whitespace-pre-wrap text-white">{selectedRow.paymentNote}</p></div> : null}
           </div>
           {selectedRow.paymentProofImage ? (
             <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/60 p-3">
-              <p className="text-xs uppercase tracking-wide text-slate-400">Payment proof</p>
-              <a href={selectedRow.paymentProofImage} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-sm text-indigo-300 hover:text-indigo-200">
-                {selectedRow.paymentProofName || 'View uploaded payment proof'}
+              <p className="mb-2 text-xs uppercase tracking-wide text-slate-400">Payment receipt / proof</p>
+              <a href={selectedRow.paymentProofImage} target="_blank" rel="noreferrer" className="inline-block">
+                <img src={selectedRow.paymentProofImage} alt="Uploaded payment receipt" className="max-h-96 max-w-full rounded-lg object-contain" />
               </a>
+              <p className="mt-2 text-xs text-slate-400">{selectedRow.paymentProofName || 'Uploaded payment proof'}</p>
             </div>
-          ) : null}
+          ) : <p className="mt-4 text-sm text-slate-400">No payment receipt has been uploaded.</p>}
           <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" disabled={updatingId === selectedRow._id} onClick={() => updateApplication(selectedRow._id, 'Approved', selectedRow.paymentStatus || 'Paid')} className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50">Approve application</button>
-            <button type="button" disabled={updatingId === selectedRow._id} onClick={() => updateApplication(selectedRow._id, 'Rejected', 'Failed')} className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200 hover:bg-red-500/20 disabled:opacity-50">Reject application</button>
+            <button type="button" disabled={updatingId === selectedRow._id} onClick={() => updateApplication(selectedRow._id, 'Approved')} className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50">Approve application</button>
+            <button type="button" disabled={updatingId === selectedRow._id} onClick={() => updateApplication(selectedRow._id, 'Rejected')} className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200 hover:bg-red-500/20 disabled:opacity-50">Reject application</button>
           </div>
         </div>
       ) : null}

@@ -46,7 +46,7 @@ export async function POST(request) {
     amount: 0,
   };
 
-  await db.collection('admissions').insertOne(record);
+  await db.collection('students').insertOne(record);
   return Response.json({ success: true, student: record });
 }
 
@@ -67,7 +67,7 @@ export async function PATCH(request) {
   const { getDb } = await import('@/lib/mongodb');
   const db = await getDb();
   const filter = ObjectId.isValid(recordId) ? { _id: new ObjectId(recordId) } : { _id: recordId };
-  const result = await db.collection('admissions').updateOne(
+  const result = await db.collection('students').updateOne(
     filter,
     {
       $set: {
@@ -77,11 +77,13 @@ export async function PATCH(request) {
         email,
         course,
         status: status || 'Active',
-        admissionStatus: status || 'Active',
         updatedAt: new Date(),
       }
     }
   );
 
-  return Response.json({ success: result.modifiedCount > 0 || result.matchedCount > 0 });
+  if (!result.matchedCount) {
+    return Response.json({ success: false, error: 'Student not found.' }, { status: 404 });
+  }
+  return Response.json({ success: true });
 }

@@ -85,6 +85,11 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           ADMIN_SESSION_SECRET: ${{ secrets.ADMIN_SESSION_SECRET }}
           STUDENT_SESSION_SECRET: ${{ secrets.STUDENT_SESSION_SECRET }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
           STORAGE_HOST_DIR: /home/mrh123/data/Project-1
         run: |
           set -eu
@@ -101,6 +106,11 @@ jobs:
             -e ADMIN_PASSWORD \
             -e ADMIN_SESSION_SECRET \
             -e STUDENT_SESSION_SECRET \
+            -e SMTP_HOST \
+            -e SMTP_PORT \
+            -e SMTP_USER \
+            -e SMTP_PASSWORD \
+            -e SMTP_FROM \
             mrh-study-hub:latest
 
       - name: Verify Deployment

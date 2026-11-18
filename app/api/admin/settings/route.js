@@ -3,6 +3,8 @@ import { getDb } from '@/lib/mongodb';
 import { SITE } from '@/lib/siteData';
 import { deleteStoredFile, saveUploadedFile, storagePathFromUploadUrl } from '@/lib/localStorage';
 
+const DEFAULT_STUDENT_EMAIL_FROM = 'mrh408520@gmail.com';
+
 function normalizePaymentQrUrl(paymentQrUrl) {
   if (typeof paymentQrUrl !== 'string') return '';
   const trimmed = paymentQrUrl.trim();
@@ -21,6 +23,7 @@ async function ensureDefaultSettings(db) {
       registrationPrice: fallbackPrice,
       paymentQrUrl: '',
       paymentQrPath: '',
+      studentEmailFrom: process.env.SMTP_FROM || DEFAULT_STUDENT_EMAIL_FROM,
       status: 'active',
       updatedAt: new Date(),
       lastUpdatedAt: new Date(),
@@ -34,8 +37,11 @@ async function ensureDefaultSettings(db) {
   const normalizedPrice = Number(settings.registrationPrice ?? fallbackPrice);
   const normalizedQrUrl = normalizePaymentQrUrl(settings.paymentQrUrl);
   const normalizedQrPath = storagePathFromUploadUrl(normalizedQrUrl);
+  const studentEmailFrom = String(
+    settings.studentEmailFrom || process.env.SMTP_FROM || DEFAULT_STUDENT_EMAIL_FROM
+  ).trim();
 
-  if (settings.paymentQrUrl !== normalizedQrUrl || settings.paymentQrPath !== normalizedQrPath || Number(settings.registrationPrice ?? fallbackPrice) !== normalizedPrice) {
+  if (settings.paymentQrUrl !== normalizedQrUrl || settings.paymentQrPath !== normalizedQrPath || Number(settings.registrationPrice ?? fallbackPrice) !== normalizedPrice || settings.studentEmailFrom !== studentEmailFrom) {
     await collection.updateOne(
       { name: 'registration_payment' },
       {
@@ -43,6 +49,7 @@ async function ensureDefaultSettings(db) {
           registrationPrice: normalizedPrice,
           paymentQrUrl: normalizedQrUrl,
           paymentQrPath: normalizedQrPath,
+          studentEmailFrom,
           updatedAt: new Date(),
           lastUpdatedAt: new Date(),
           registrationPriceUpdatedAt: settings.registrationPriceUpdatedAt || new Date(),
@@ -176,6 +183,37 @@ export async function POST(request) {
 
     const payload = await request.json();
     const action = String(payload.action || 'price');
+
+    if (action === 'student-email-from') {
+      const studentEmailFrom = String(payload.studentEmailFrom || '').trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(studentEmailFrom)) {
+        return Response.json({ error: 'Enter a valid sender email address.' }, { status: 400 });
+      }
+
+      const doc = await ensureDefaultSettings(db);
+      const now = new Date();
+      await collection.updateOne(
+        { name: 'registration_payment' },
+        {
+          $set: {
+            ...doc,
+            studentEmailFrom,
+            updatedAt: now,
+            lastUpdatedAt: now,
+            updatedBy: user.username || 'admin',
+          },
+        },
+        { upsert: true }
+      );
+
+      return Response.json({
+        success: true,
+        message: 'Student sender email updated successfully.',
+        studentEmailFrom,
+        lastUpdated: now.toISOString(),
+      });
+    }
+
     const registrationPrice = Number(payload.registrationPrice);
 
     if (action === 'qr') {
