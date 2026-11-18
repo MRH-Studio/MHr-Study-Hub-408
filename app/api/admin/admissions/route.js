@@ -16,7 +16,7 @@ async function getMailTransport(db) {
   const settings = await db.collection('settings').findOne({ name: 'registration_payment' });
   const from = String(settings?.studentEmailFrom || process.env.SMTP_FROM || 'mrh408520@gmail.com').trim();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from)) {
-    throw new Error('The student email sender address is not valid. Update it in admin settings.');
+    throw new Error('The student sender email address is not valid. Update it in admin settings.');
   }
 
   const port = Number(SMTP_PORT);
@@ -45,16 +45,33 @@ function escapeHtml(value) {
   })[character]);
 }
 
+async function sendStudentCredentialsEmail(db, { to, name, studentId, password, course }) {
+  const { from, transport } = await getMailTransport(db);
+  const safeName = escapeHtml(name);
+  const safeCourse = escapeHtml(course);
+  const mailResult = await transport.sendMail({
+    from: { name: 'MRH_study', address: from },
+    to,
+    subject: 'Your MRH Study Hub student account',
+    text: `Hello ${name},\n\nYour admission has been approved.\nStudent ID: ${studentId}\nPermanent password: ${password}\nCourse: ${course}\n\nPlease keep these credentials private.`,
+    html: `<p>Hello ${safeName},</p><p>Your admission has been approved.</p><p><strong>Student ID:</strong> ${studentId}<br><strong>Permanent password:</strong> ${password}<br><strong>Course:</strong> ${safeCourse}</p><p>Please keep these credentials private.</p>`,
+  });
+  const emailAccepted = Array.isArray(mailResult.accepted)
+    && mailResult.accepted.some((recipient) => String(recipient).toLowerCase() === to.toLowerCase());
+  if (!emailAccepted) {
+    throw new Error(`SMTP did not accept the credentials email for ${to}.`);
+  }
+}
+
 async function provisionStudent(db, admission) {
   const students = db.collection('students');
   const admissionId = String(admission._id);
   let student = await students.findOne({ admissionId });
 
   if (student && !student.provisioning && admission.admissionStatus === 'Approved') {
-    return student;
+    return { emailSent: false };
   }
 
-  const { from, transport } = await getMailTransport(db);
   const email = String(admission.email || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error('The application does not have a valid email address.');
@@ -100,14 +117,12 @@ async function provisionStudent(db, admission) {
     { upsert: true }
   );
 
-  const name = escapeHtml(record.fullName);
-  const course = escapeHtml(record.course);
-  await transport.sendMail({
-    from,
+  await sendStudentCredentialsEmail(db, {
     to: email,
-    subject: 'Your MR.H Study Hub student account',
-    text: `Hello ${record.fullName},\n\nYour admission has been approved.\nStudent ID: ${studentId}\nTemporary password: ${password}\nCourse: ${record.course}\n\nPlease keep these credentials private.`,
-    html: `<p>Hello ${name},</p><p>Your admission has been approved.</p><p><strong>Student ID:</strong> ${studentId}<br><strong>Temporary password:</strong> ${password}<br><strong>Course:</strong> ${course}</p><p>Please keep these credentials private.</p>`,
+    name: record.fullName,
+    studentId,
+    password,
+    course: record.course,
   });
 
   await db.collection('admissions').updateOne(
@@ -121,12 +136,20 @@ async function provisionStudent(db, admission) {
       },
     }
   );
+  const credentialsUpdatedAt = new Date();
   await students.updateOne(
     { admissionId },
-    { $set: { provisioning: false, credentialEmailedAt: new Date(), updatedAt: new Date() } }
+    {
+      $set: {
+        provisioning: false,
+        credentialEmailedAt: credentialsUpdatedAt,
+        passwordUpdatedAt: credentialsUpdatedAt,
+        updatedAt: credentialsUpdatedAt,
+      },
+    }
   );
 
-  return { ...record, provisioning: false };
+  return { emailSent: true };
 }
 
 export async function GET() {
@@ -162,9 +185,11 @@ export async function PATCH(request) {
     return Response.json({ error: 'Application not found.' }, { status: 404 });
   }
 
+  let emailSent = false;
   if (admissionStatus === 'Approved') {
     try {
-      await provisionStudent(db, current);
+      const result = await provisionStudent(db, current);
+      emailSent = result.emailSent;
     } catch (error) {
       console.error('Student provisioning failed:', error);
       return Response.json(
@@ -187,5 +212,10 @@ export async function PATCH(request) {
     );
   }
   const refreshed = await db.collection('admissions').findOne(filter);
-  return Response.json({ success: true, application: refreshed });
+  return Response.json({
+    success: true,
+    application: refreshed,
+    emailSent,
+    emailTo: emailSent ? refreshed?.email || '' : '',
+  });
 }

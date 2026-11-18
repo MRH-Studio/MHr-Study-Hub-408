@@ -16,14 +16,15 @@ Add:
 - `ADMIN_SESSION_SECRET` — long random secret
 - `STUDENT_SESSION_SECRET` — long random secret
 
-To email student credentials when an admission is approved, add these SMTP secrets:
+To send generated student credentials through Gmail SMTP, add these GitHub repository secrets:
 
-- `SMTP_HOST` — mail provider SMTP host (for Gmail, `smtp.gmail.com`)
-- `SMTP_PORT` — SMTP port (`465` for SSL or `587` for STARTTLS)
-- `SMTP_USER` — mailbox username/address
-- `SMTP_PASSWORD` — mailbox password or provider app password
+- `SMTP_HOST` — Gmail SMTP host (`smtp.gmail.com`)
+- `SMTP_PORT` — `465` for SSL
+- `SMTP_USER` — Gmail mailbox address
+- `SMTP_PASSWORD` — Google App Password (not the regular Gmail password)
+- `SMTP_FROM` — optional initial sender email; the current sender is also stored in MongoDB and can be changed in **Admin → Registration & Payment Settings → Student Credential Sender Email**
 
-The sender address is stored in MongoDB and can be changed in **Admin → Registration & Payment Settings → Student Credential Sender Email**. It defaults to `mrh408520@gmail.com`; the optional `SMTP_FROM` secret is only used to initialize the database setting on a fresh setup. For Gmail, set `SMTP_USER` to the same mailbox and use a Google App Password as `SMTP_PASSWORD` (enable 2-Step Verification first; do not use your regular account password). The SMTP settings are needed before approving admissions. If mail is not configured or delivery fails, approval is not completed. The generated password is emailed to the student, and only its salted hash is stored in MongoDB.
+If SMTP is not configured or rejects the recipient, approval is not completed. The app creates a random password, emails the student ID and password to the student's registered email, and stores only the salted password hash in MongoDB.
 
 Generate independent random values on a trusted machine with:
 

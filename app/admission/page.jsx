@@ -8,6 +8,7 @@ import Footer from '@/components/site/Footer';
 import { SITE } from '@/lib/siteData';
 import { buildUpiPaymentUrl } from '@/lib/payment';
 import { ArrowRight, CheckCircle2, Copy, ShieldCheck, Sparkles, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 function AdmissionInner(){
   const params = useSearchParams();
@@ -70,7 +71,13 @@ function AdmissionInner(){
       if (!res.ok) throw new Error(data?.error || 'Failed');
       setAdmission(data);
       setStep(2);
-    } catch (err) { setError(err.message); } finally { setSubmitting(false); }
+      toast.success('Registration submitted', {
+        description: `Continue with payment. Your student ID and password will be emailed to ${form.email} after admin approval.`,
+      });
+    } catch (err) {
+      setError(err.message);
+      toast.error('Registration failed', { description: err.message });
+    } finally { setSubmitting(false); }
   };
 
   const submitPayment = async (e) => {
@@ -92,7 +99,13 @@ function AdmissionInner(){
       if (!res.ok) throw new Error(data?.error || 'Failed');
       setConfirmed(data);
       setStep(3);
-    } catch (err) { setError(err.message); } finally { setSubmitting(false); }
+      toast.success('Payment details submitted', {
+        description: `After admin approval, your student ID and password will be emailed to ${form.email}.`,
+      });
+    } catch (err) {
+      setError(err.message);
+      toast.error('Payment submission failed', { description: err.message });
+    } finally { setSubmitting(false); }
   };
 
   const copy = (t) => navigator.clipboard?.writeText(t);

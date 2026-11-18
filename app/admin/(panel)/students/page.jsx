@@ -40,8 +40,8 @@ export default function StudentsPage() {
 
   const exportCsv = () => {
     const csvRows = [
-      ['Student ID', 'Student Name', 'Contact Number', 'Email', 'Enrolled Course', 'Enrollment Date', 'Status'],
-      ...filteredRows.map((row) => [row.studentId || '', row.name || '', row.phone || '', row.email || '', row.course || '', row.enrollmentDate ? new Date(row.enrollmentDate).toISOString() : '', row.status || ''])
+      ['Student ID', 'Student Name', 'Contact Number', 'Email', 'Enrolled Course', 'Enrollment Date', 'Password Updated', 'Status'],
+      ...filteredRows.map((row) => [row.studentId || '', row.name || '', row.phone || '', row.email || '', row.course || '', row.enrollmentDate ? new Date(row.enrollmentDate).toISOString() : '', row.passwordUpdatedAt ? new Date(row.passwordUpdatedAt).toISOString() : '', row.status || ''])
     ];
     const content = csvRows.map((entry) => entry.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
@@ -102,6 +102,7 @@ export default function StudentsPage() {
     { key: 'email', label: 'Email' },
     { key: 'course', label: 'Enrolled Course' },
     { key: 'enrollmentDate', label: 'Enrollment Date' },
+    { key: 'passwordUpdatedAt', label: 'Password Updated' },
     { key: 'status', label: 'Status', render: (value) => <StatusBadge status={value || 'Active'} /> },
     { key: 'actions', label: 'Actions', render: (_, row) => (
       <div className="flex gap-2">
@@ -113,6 +114,7 @@ export default function StudentsPage() {
   const tableRows = filteredRows.map((row) => ({
     ...row,
     enrollmentDate: row.enrollmentDate ? new Date(row.enrollmentDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+    passwordUpdatedAt: row.passwordUpdatedAt ? new Date(row.passwordUpdatedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Not set',
   }));
 
   return (

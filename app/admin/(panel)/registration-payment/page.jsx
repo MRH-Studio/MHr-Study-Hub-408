@@ -417,7 +417,7 @@ export default function RegistrationPaymentSettingsPage() {
           </div>
           <div>
             <h3 className="text-xl font-bold text-white">Student Credential Sender Email</h3>
-            <p className="mt-1 text-sm text-slate-400">This address is stored in the database and used as the From address for student emails.</p>
+            <p className="mt-1 text-sm text-slate-400">This database address is used as the From address for student credential emails.</p>
           </div>
         </div>
         <form onSubmit={handleStudentEmailSubmit} className="flex flex-col gap-3 sm:flex-row">
@@ -438,7 +438,7 @@ export default function RegistrationPaymentSettingsPage() {
           </button>
         </form>
         {emailMessage ? <p className="mt-3 text-sm text-slate-300">{emailMessage}</p> : null}
-        <p className="mt-2 text-xs text-slate-500">The SMTP mailbox username and app password remain server secrets; for Gmail, the sender address should match that mailbox.</p>
+        <p className="mt-2 text-xs text-slate-500">Student ID and generated password are sent to the student's registered email. SMTP credentials remain in server environment settings.</p>
       </section>
     </div>
   );

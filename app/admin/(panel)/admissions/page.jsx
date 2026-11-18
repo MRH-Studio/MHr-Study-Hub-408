@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Download, Search, FileText } from 'lucide-react';
+import { toast } from 'sonner';
 import DataTable from '../../components/DataTable';
 import StatusBadge from '../../components/StatusBadge';
 
@@ -82,8 +83,21 @@ export default function AdmissionsPage() {
       setSelectedRow((current) => (current && (current._id === applicationId || current.id === applicationId)
         ? { ...current, admissionStatus, ...(paymentStatus ? { paymentStatus } : {}) }
         : current));
+      if (admissionStatus === 'Approved') {
+        if (data.emailSent) {
+          toast.success('Admission approved; email sent', {
+            description: `SMTP accepted the student ID and password email for ${data.emailTo}. Check Spam/Promotions if needed.`,
+          });
+        } else {
+          toast.info('Admission already approved', {
+            description: 'No new credentials email was sent.',
+          });
+        }
+      }
     } catch (error) {
-      alert(error.message || 'Failed to update application.');
+      toast.error(admissionStatus === 'Approved' ? 'Unable to approve admission' : 'Unable to update admission', {
+        description: error.message || 'Failed to update application.',
+      });
     } finally {
       setUpdatingId(null);
     }
